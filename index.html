@@ -1,0 +1,31 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#eef2ec"><title>阿钰的英语岛 9.0 · 樱花小镇冒险</title><link rel="stylesheet" href="./assets/css/game.css"></head><body><div class="wrap">
+<header class="top"><div class="brand-seal" aria-hidden="true">EI.</div><div class="brand-copy"><div class="eyebrow">ENGLISH ISLAND · 9.0</div><b>阿钰的英语岛</b></div><div class="top-actions"><button type="button" class="icon-action" title="切换主题" aria-label="切换主题" onclick="openThemeSettings()">◐</button><button type="button" class="icon-action" title="朗读设置" aria-label="朗读设置" onclick="openVoiceSettings()">♫</button></div></header>
+<div class="quick-stats" id="stats" aria-live="polite">正在读取学习进度…</div>
+<main id="app"><div class="card">正在打开英语岛…</div></main></div>
+<nav class="bottom" aria-label="页面导航">
+<button id="nav-home" onclick="navigate('home')"><span>⌂</span>首页</button>
+<button id="nav-study" onclick="navigate('study')"><span>▤</span>学习</button>
+<button id="nav-reader" onclick="navigate('reader')"><span>▧</span>书屋</button>
+<button id="nav-map" onclick="navigate('map')"><span>◇</span>探索</button>
+<button id="nav-companion" onclick="navigate('companion')"><span>♧</span>伙伴</button>
+</nav>
+<div class="theme-shade" id="theme-shade" role="dialog" aria-modal="true" aria-label="视觉主题选择" onclick="if(event.target===this)closeThemeSettings()"><div class="theme-panel">
+<div class="row"><div><div class="kicker">APPEARANCE</div><h2 style="margin:0">选择你的学习氛围</h2></div><button type="button" class="btn smallbtn" onclick="closeThemeSettings()">关闭 ✕</button></div>
+<p class="muted" style="margin-top:15px">三种主题随时切换，单词与学习进度保持不变。</p>
+<div class="theme-grid">
+<button class="theme-choice" id="theme-pick-sage" onclick="setTheme('sage')"><span class="swatches"><i style="background:#edf2eb"></i><i style="background:#dce8dd"></i><i style="background:#416d58"></i></span><span><b>自然疗愈</b><small>温柔的留白与鼠尾草绿 · 默认</small></span></button>
+<button class="theme-choice" id="theme-pick-editorial" onclick="setTheme('editorial')"><span class="swatches"><i style="background:#f8f5ef"></i><i style="background:#e6e0d5"></i><i style="background:#74664e"></i></span><span><b>极简编辑</b><small>奶油白、纸张感、优雅排版</small></span></button>
+<button class="theme-choice" id="theme-pick-noir" onclick="setTheme('noir')"><span class="swatches"><i style="background:#141917"></i><i style="background:#2a352e"></i><i style="background:#c8d8b9"></i></span><span><b>黑白质感</b><small>深色空间，适合夜晚阅读</small></span></button>
+</div><button class="btn primary wide" onclick="closeThemeSettings()">完成 · 开始学习</button>
+</div></div>
+<div class="voice-shade" id="voice-overlay" role="dialog" aria-modal="true" aria-labelledby="voice-title" onclick="if(event.target===this)closeVoiceSettings()"><div class="voice-modal">
+<div class="row"><span id="voice-title" class="voice-title">🎧 英语朗读设置</span><button class="btn smallbtn" onclick="closeVoiceSettings()">关闭 ✕</button></div>
+<p class="voice-help">语音来自你手机/浏览器安装的英语声音。可以试听，挑选舒服的音色；如果设备只有机械音色，这里无法凭空生成真人发音。</p>
+<label for="voice-accent">英语口音</label><select id="voice-accent" onchange="updateVoiceAccent(this.value)"><option value="en-US">🇺🇸 美式英语</option><option value="en-GB">🇬🇧 英式英语</option></select>
+<label for="voice-picker">具体音色（从本机读取）</label><select id="voice-picker" onchange="updateVoiceChoice(this.value)"><option value="auto">✨ 自动选择英语音色</option></select>
+<div id="voice-availability" class="muted" style="margin-top:6px">正在读取设备语音列表……</div>
+<label for="voice-rate">语速：<span id="voice-rate-value">0.90×</span></label><input id="voice-rate" type="range" min="0.75" max="1.15" step="0.05" value="0.90" oninput="updateVoiceRate(this.value)">
+<div class="grid" style="margin-top:17px"><button class="btn green" onclick="speak('Good morning. Welcome to English Island.')">▶ 试听自然句</button><button class="btn" onclick="speak('offer')">▶ 试听单词</button></div>
+<button class="btn primary wide" onclick="closeVoiceSettings()">保存设置，继续学习 🌸</button>
+<p class="muted">如声音仍不自然，可以尝试 Chrome 和手机系统里的英语语音包。不要通过不明网站安装语音文件。</p>
+</div></div><script defer src="./assets/js/game-core.js"></script><script defer src="./assets/js/sakura-adventure.js"></script></body></html>

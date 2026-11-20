@@ -104,7 +104,7 @@ function studyDetailMarkup(i) {
 }
 function toggleClassroomGrammar(){
  const j=data.journey;
- if(!j||j.phase!=='copy')return;
+ if(!j||!['teach','copy'].includes(j.phase))return;
  j.showGrammar=!j.showGrammar;
  renderFlowCopy();
  document.querySelector('.flow-lesson .grammar-toggle')?.focus({preventScroll:true});
@@ -152,7 +152,11 @@ function flowNext(){if(flowTimer)clearTimeout(flowTimer);const j=data.journey;if
  if(j.pending.length){const chosen=shuffle(j.pending)[0];j.pending.splice(j.pending.indexOf(chosen),1);beginFlowQuiz(chosen);return}
  j.active=false;j.phase='done';save();$('app').innerHTML=`<div class="card"><div class="hero"><div style="font-size:60px">🏆🌸</div><h2>今天的连续学习完成啦！</h2><p>本轮认识 <b>${j.newDone}</b> 个新词，完成 <b>${j.checks}</b> 次穿插抽查。</p><p class="muted">你可以去樱花小镇自由探索，或者随时回来复习。</p></div><button class="btn primary wide" onclick="navigate('map')">🏝️ 前往樱花小镇</button><button class="btn wide" onclick="navigate('study')">📚 返回学习页面</button></div>`;refresh();flowTop()}
 function renderFlowTeach(){
+ renderFlowCopy();
+}
+function beginFlowCopy(){
  const j=data.journey;
+ if(j.phase!=='teach')return;
  Object.assign(j,{phase:'copy',tiles:tilesFor(j.id),picked:[],typed:'',writeMode:j.writeMode||data.copyPreference||'tiles',feedback:''});
  renderFlowCopy();
 }
@@ -207,7 +211,8 @@ function renderFlowCopy(){
  const j=data.journey, id=j.id, w=WORDS[id], copy=j.phase==='copy';
  if(!j.writeMode)j.writeMode=data.copyPreference||'tiles';
  const wordAudio='<button type="button" class="btn flow-audio" aria-label="听单词发音" onclick="speak(WORDS[data.journey.id].en)">♫</button>';
- const wordCard=copy?`<div class="journey-card">
+ const teaching=j.phase==='teach';
+ const wordCard=(copy||teaching)?`<div class="journey-card">
    <div class="flow-lesson-row">
      <div><div class="journey-word">${escapeWord(w.en.trim())}</div><div class="fineprint">${escapeWord(w.ipa?'['+w.ipa+']':'音标待核对')}</div></div>
      ${wordAudio}
@@ -216,6 +221,15 @@ function renderFlowCopy(){
  </div>${studyDetailMarkup(id)}`:`<div class="journey-card">
    <span class="tag">不看答案 · 穿插抽查</span><div class="journey-cn">${escapeWord(w.cn)}</div>${posMini(id)}${wordAudio}
  </div>`;
+ if(teaching){
+   $('app').innerHTML=`<div class="card flow-lesson">
+     <div class="kicker">新词 · 第 ${id+1} / ${WORDS.length} 词</div>${introProgress()}${wordCard}
+     <button class="lesson-start" onclick="beginFlowCopy()"><span>我理解啦 · 进入跟写</span><span aria-hidden="true">→</span></button>
+     <button class="btn ghost wide" onclick="navigate('study')">暂停并保存</button>
+   </div>`;
+   refresh();
+   return;
+ }
  const keyboard=`<div id="typing-guide">${typingGuideMarkup(j.typed||'',copy)}</div>
    <input class="inputword" id="wordInput" aria-label="输入英语单词" placeholder="点击输入字母" value="${escapeWord(j.typed||'')}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" oninput="flowTypingInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();flowCheckKeyboard()}">
    <div class="typo-note" id="typing-status" aria-live="polite">拼写正确后自动继续</div>

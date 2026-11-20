@@ -83,13 +83,32 @@ const READING_TRANSLATIONS={"A Little Help":["米娅有一本私人笔记本。"
 function posOf(i){return WORD_POS[i]||'词性待核对'}
 function topicGrammar(i){return CLASSROOM_NOTES[WORDS[i].en.trim().toLowerCase()]||null}
 function posMini(i){return `<div class="pos-chip">${escapeWord(posOf(i))}</div>`}
-function studyDetailMarkup(i){
- const w=WORDS[i],key=w.en.trim().toLowerCase(),ex=STUDY_EXAMPLES[key],notes=topicGrammar(i),j=data.journey;
- if(!ex)return `<div class="lesson-card"><div class="lesson-head">📖 例句课堂</div><p class="fineprint">这个词已加入词性和释义，专属例句与语法讲解仍待核对。先学习词义与发音，不会把未经核对的句子当成教材。</p>${WORD_BUILD[key]?`<div class="lesson-tip">🧩 构词提示：${escapeWord(WORD_BUILD[key])}</div>`:''}</div>`;
- let full=Boolean(j&&j.showGrammar);
- return `<div class="lesson-card"><div class="lesson-head"><span>02 · 例句理解</span><span class="lesson-badge">学会怎么用</span></div><div class="example-en">${escapeWord(ex[0])}</div><div class="example-cn">${escapeWord(ex[1])}</div><button type="button" class="btn smallbtn" onclick="speak(STUDY_EXAMPLES[WORDS[data.journey.id].en.trim().toLowerCase()][0])">♫ 听完整句子</button><div class="lesson-summary"><b>🌱 这句话怎么理解？</b><p>${escapeWord(notes?notes[1]:'先找出谁做什么，再看目标单词在句子里的作用。')}</p>${notes?`<div class="fineprint">本句中：${escapeWord(notes[0])}</div>`:''}</div><button type="button" class="btn grammar-toggle wide" onclick="toggleClassroomGrammar()">${full?'收起语法拆解 ↑':'🧩 为什么这样写？展开语法 ↓'}</button>${full?`<div class="grammar-extra"><div class="lesson-head">03 · 语法与用法</div><p>${escapeWord(notes?notes[2]:'这个词的详细句法说明仍在补充。')}</p>${WORD_BUILD[key]?`<div class="lesson-tip"><b>构词小贴士：</b>${escapeWord(WORD_BUILD[key])}</div>`:''}<p class="fineprint">提示：词形变化（如 offer → offers）和构词派生（如 person → personal）是不同知识点。</p></div>`:''}</div>`
+function studyDetailMarkup(i) {
+ const key=WORDS[i].en.trim().toLowerCase(), example=STUDY_EXAMPLES[key], notes=topicGrammar(i);
+ if(!example)return WORD_BUILD[key]?`<p class="lesson-tip">构词提示：${escapeWord(WORD_BUILD[key])}</p>`:'';
+ const expanded=Boolean(data.journey.showGrammar);
+ return `<div class="lesson-card">
+   <div class="flow-lesson-row">
+     <div><div class="example-en">${escapeWord(example[0])}</div><div class="example-cn">${escapeWord(example[1])}</div></div>
+     <button type="button" class="btn flow-audio" aria-label="朗读例句" onclick="speak(STUDY_EXAMPLES[WORDS[data.journey.id].en.trim().toLowerCase()][0])">♫</button>
+   </div>
+   <button type="button" class="btn ghost grammar-toggle" aria-expanded="${expanded}" aria-controls="flow-grammar" onclick="toggleClassroomGrammar()">${expanded?'收起语法 ↑':'展开语法 ↓'}</button>
+   <div id="flow-grammar"${expanded?'':' hidden'}>${expanded?`<div class="grammar-extra">
+     <p>${escapeWord(notes?notes[1]:'先找出谁做什么，再看目标单词在句子里的作用。')}</p>
+     ${notes?`<p>本句中：${escapeWord(notes[0])}</p>`:''}
+     <p>${escapeWord(notes?notes[2]:'这个词的详细句法说明仍在补充。')}</p>
+     ${WORD_BUILD[key]?`<p>构词提示：${escapeWord(WORD_BUILD[key])}</p>`:''}
+     <p class="fineprint">词形变化（如 offer → offers）和构词派生（如 person → personal）是不同知识点。</p>
+   </div>`:''}</div>
+ </div>`;
 }
-function toggleClassroomGrammar(){const j=data.journey;if(!j||j.phase!=='teach')return;j.showGrammar=!j.showGrammar;save();renderFlowTeach()}
+function toggleClassroomGrammar(){
+ const j=data.journey;
+ if(!j||j.phase!=='copy')return;
+ j.showGrammar=!j.showGrammar;
+ renderFlowCopy();
+ document.querySelector('.flow-lesson .grammar-toggle')?.focus({preventScroll:true});
+}
 function normalizeReadTerm(k){return String(k||'').toLowerCase().replace(/[^a-z]/g,'')}
 function inferReadingTerm(raw){
  const k=normalizeReadTerm(raw),found=readKeyForWord(k);
@@ -132,15 +151,15 @@ function flowNext(){if(flowTimer)clearTimeout(flowTimer);const j=data.journey;if
  if(j.newDone<j.target){const id=nextUnlearned();if(id>=0){j.id=id;j.phase='teach';save();renderFlowTeach();flowTop();return}j.newDone=j.target}
  if(j.pending.length){const chosen=shuffle(j.pending)[0];j.pending.splice(j.pending.indexOf(chosen),1);beginFlowQuiz(chosen);return}
  j.active=false;j.phase='done';save();$('app').innerHTML=`<div class="card"><div class="hero"><div style="font-size:60px">🏆🌸</div><h2>今天的连续学习完成啦！</h2><p>本轮认识 <b>${j.newDone}</b> 个新词，完成 <b>${j.checks}</b> 次穿插抽查。</p><p class="muted">你可以去樱花小镇自由探索，或者随时回来复习。</p></div><button class="btn primary wide" onclick="navigate('map')">🏝️ 前往樱花小镇</button><button class="btn wide" onclick="navigate('study')">📚 返回学习页面</button></div>`;refresh();flowTop()}
-function studyExample(id){return STUDY_EXAMPLES[WORDS[id].en.trim().toLowerCase()]||null}
-function exampleMarkup(id){const x=studyExample(id);if(!x)return `<div class="example-box"><div class="translation">📘 这个词的例句正在补充。先学词义和发音，避免使用不准确的例句。</div></div>`;return `<div class="example-box"><div class="english">${escapeWord(x[0])}</div><div class="translation">${escapeWord(x[1])}</div><button class="btn smallbtn wide" onclick="speak(STUDY_EXAMPLES[WORDS[data.journey.id].en.trim().toLowerCase()][0])">🔊 朗读例句</button></div>`}
-function renderFlowTeach(){const j=data.journey,id=j.id,w=WORDS[id];j.phase='teach';save();$('app').innerHTML=`<div class="card">${introProgress()}<div class="journey-card"><div style="font-size:45px">🦉📖</div><span class="tag">第${id+1}/688词 · 先认识</span><div class="journey-word">${escapeWord(w.en.trim())}</div><p class="muted">${escapeWord(w.ipa?'['+w.ipa+']':'此词音标待核对')}</p><div class="journey-cn">${escapeWord(w.cn)}</div><button class="btn green wide" onclick="speak(WORDS[data.journey.id].en)">🔊 听单词发音</button>${exampleMarkup(id)}</div><p class="flow-caption">认识之后可选逐字跟打，或点击乱序字母；随后系统会隔开几个词随机抽查。</p><button class="btn primary wide" onclick="beginFlowCopy()">✍️ 跟写练习 · 继续</button><button class="btn smallbtn wide" onclick="navigate('study')">暂时休息（自动保存进度）</button></div>`;refresh()}
-function beginFlowCopy(){const j=data.journey;j.phase='copy';j.tiles=tilesFor(j.id);j.picked=[];j.typed='';j.writeMode=j.writeMode||data.copyPreference||'tiles';j.feedback='';save();renderFlowCopy();flowTop()}
+function renderFlowTeach(){
+ const j=data.journey;
+ Object.assign(j,{phase:'copy',tiles:tilesFor(j.id),picked:[],typed:'',writeMode:j.writeMode||data.copyPreference||'tiles',feedback:''});
+ renderFlowCopy();
+}
 function flowSetMode(mode){const j=data.journey;if(!['tiles','keyboard'].includes(mode))return;j.writeMode=mode;data.copyPreference=mode;j.picked=[];j.typed='';j.feedback='';save();renderFlowCopy()}
 function chosenWord(){const j=data.journey;return (j.picked||[]).map(i=>j.tiles[i]).join('')}
 function drawTiles(){const j=data.journey,word=spellWord(j.id);return `<div class="slots">${[...word].map((c,i)=>`<div class="slot">${escapeWord(chosenWord()[i]||'·')}</div>`).join('')}</div><div class="letter-bank">${j.tiles.map((c,i)=>`<button class="letter-tile" onclick="flowPick(${i})" ${j.picked.includes(i)?'disabled':''}>${escapeWord(c)}</button>`).join('')}</div><div class="grid"><button class="btn smallbtn" onclick="flowUndo()">↩️ 撤回</button><button class="btn smallbtn" onclick="flowReset()">🔄 重排</button></div>`}
 function typingGuideMarkup(value='',reveal=true){const word=spellWord(data.journey.id),v=String(value||'').toLowerCase();return `<div class="typing-display">${[...word].map((ch,i)=>{const filled=i<v.length;const status=filled?(v[i]===ch?'ok':'no'):(i===v.length?'next':'');return `<span class="typing-letter ${status}" aria-label="字母${i+1}">${filled?escapeWord(v[i]):(reveal?'·':'_')}</span>`}).join('')}</div>`}
-function renderFlowCopy(){const j=data.journey,id=j.id,w=WORDS[id],copy=j.phase==='copy',preview=copy;const prompt=preview?'<b>⌨️ 看着英文，边打字边记字母顺序</b>':'<b>🧠 穿插抽查！英文隐藏，试试看还能拼出来吗？</b>';if(!j.writeMode)j.writeMode=data.copyPreference||'tiles';$('app').innerHTML=`<div class="card">${introProgress()}<div class="row"><span class="tag">${copy?'✍️ 跟写教学':'🎲 课堂随机默写'}</span><span class="tag">${copy?'先记忆':'不看英文'}</span></div><div class="journey-card"><p>${prompt}</p><div class="journey-cn">${escapeWord(w.cn)}</div>${preview?`<div class="journey-word">${escapeWord(w.en.trim())}</div><p class="muted">${escapeWord(w.ipa?'['+w.ipa+']':'音标待核对')}</p>${exampleMarkup(id)}`:''}<button class="btn green wide" onclick="speak(WORDS[data.journey.id].en)">🔊 听英语发音</button></div><div class="grid"><button class="btn smallbtn ${j.writeMode==='tiles'?'primary':''}" onclick="flowSetMode('tiles')">🧩 乱序拼写</button><button class="btn smallbtn ${j.writeMode==='keyboard'?'primary':''}" onclick="flowSetMode('keyboard')">⌨️ 逐字跟打</button></div>${j.writeMode==='keyboard'?`<div class="copy-mode-description">${copy?'看着上方英文打字，输入正确时绿色亮起。':'按中文意思回忆拼写，字母有即时反馈。'}</div><div id="typing-guide">${typingGuideMarkup(j.typed||'',preview)}</div><input class="inputword" id="wordInput" aria-label="输入英语单词" placeholder="点这里，用键盘逐字输入" value="${escapeWord(j.typed||'')}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" oninput="flowTypingInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();flowCheckKeyboard()}"><div class="typo-note" id="typing-status">${j.typed?'输入中':'跟打正确会自动继续，无须再点下一词'}</div><button class="btn primary wide" onclick="flowCheckKeyboard()">✅ 检查 / 继续</button>`:drawTiles()}<div id="flow-feedback">${j.feedback||''}</div><p class="flow-caption">${copy?'跟写正确后自动继续，过几张卡还会随机抽查。':'答完自动回到连续学习；错误的词稍后再遇见。'}</p><button class="btn smallbtn wide" onclick="flowReveal()">💡 不会，查看答案并稍后重练</button></div>`;refresh()}
 function flowPick(i){const j=data.journey;if(!j||!['copy','quiz'].includes(j.phase)||j.writeMode!=='tiles'||j.picked.includes(i))return;j.picked.push(i);if(j.phase==='copy')renderFlowCopy();else renderFlowQuiz();if(j.picked.length===spellWord(j.id).length)flowCheckSpelling(chosenWord())}
 function flowUndo(){const j=data.journey;j.picked.pop();if(j.phase==='copy')renderFlowCopy();else renderFlowQuiz()}
 function flowReset(){const j=data.journey;j.picked=[];j.tiles=tilesFor(j.id);if(j.phase==='copy')renderFlowCopy();else renderFlowQuiz()}
@@ -184,8 +203,40 @@ function study(){const n=fresh(),d=due(),j=data.journey,resume=j&&j.active&&j.da
 <div class="card hero-card"><div class="kicker">01 / LEARNING ROOM</div><h2 style="font-size:28px">让记忆，慢慢发生。</h2><p class="muted">认识 → 跟打 / 乱序拼写 → 自动穿插抽查 → 下一词。<br/>整个过程无需反复返回菜单。</p><div class="bar"><div class="fill" style="width:${Math.min(100,100*n/Math.max(1,data.daily))}%"></div></div><div class="row"><b>${n} / ${data.daily} 今日新词</b><span class="tag">需复习 ${d.length} 词</span></div><button class="btn primary wide" onclick="startJourney()" ${!resume&&(n>=data.daily||learned()>=688)?'disabled':''}>${resume?'↗ 继续上一次学习':'↗ 开始今日连续学习'}</button></div>
 <div class="card"><div class="kicker">YOUR REVIEW</div><h2>复习与巩固</h2><p class="muted">到期单词会自动进入今天的复习。课堂内还会穿插抽查，这里的练习是额外补充。</p><button class="btn wide" onclick="startReviewRound('due')" ${!d.length?'disabled':''}>◷ 到期词复习 <span style="float:right">${d.length} →</span></button><button class="btn wide" onclick="startReviewRound('wrong')" ${!Object.keys(data.difficult).length?'disabled':''}>↺ 错词救援 <span style="float:right">${Object.keys(data.difficult).length} →</span></button><button class="btn wide" onclick="startReviewRound('today')" ${!n?'disabled':''}>▤ 只复习今日新词 <span style="float:right">${n} →</span></button><button class="btn wide" onclick="startReviewRound('all')" ${!learned()?'disabled':''}>◈ 全部累计复习 <span style="float:right">${learned()} →</span></button><button class="btn wide" onclick="startQuiz('random')" ${!learned()?'disabled':''}>◇ 额外随机默写 <span style="float:right">→</span></button></div>
 <div class="card flat compact"><div class="row"><b>完整688词图鉴</b><button class="btn smallbtn" onclick="navigate('library')">搜索单词 ↗</button></div><p class="fineprint" style="margin:8px 0 0">保留你上传的第1—688词顺序。前56词附有已录入音标，后续音标仍待逐项核验。</p></div>`;refresh()}
-function renderFlowTeach(){const j=data.journey,id=j.id,w=WORDS[id];j.phase='teach';save();$('app').innerHTML=`<div class="card"><div class="kicker">01 / NEW WORD · 词性与句子</div>${introProgress()}<div class="journey-card"><span class="tag">NO. ${id+1} / 688</span><div class="journey-word">${escapeWord(w.en.trim())}</div><p class="fineprint">${escapeWord(w.ipa?'['+w.ipa+']':'音标待核对')}</p>${posMini(id)}<div class="journey-cn">${escapeWord(w.cn)}</div><button class="btn wide" onclick="speak(WORDS[data.journey.id].en)">♫ 听单词发音</button></div>${studyDetailMarkup(id)}<p class="flow-caption">先认识单词与例句，再跟写；学几个词后系统自动插入复习，不必返回菜单。</p><button class="btn primary wide" onclick="beginFlowCopy()">我理解啦 · 进入跟写 →</button><button class="btn ghost wide" onclick="navigate('study')">暂停并保存</button></div>`;refresh()}
-function renderFlowCopy(){const j=data.journey,id=j.id,w=WORDS[id],copy=j.phase==='copy';if(!j.writeMode)j.writeMode=data.copyPreference||'tiles';$('app').innerHTML=`<div class="card"><div class="kicker">${copy?'02 / WRITE ALONG':'03 / SURPRISE RECALL'}</div>${introProgress()}<div class="journey-card"><span class="tag">${copy?'跟写记忆':'不看答案 · 穿插抽查'}</span><div class="journey-cn" style="margin-top:22px">${escapeWord(w.cn)}</div>${posMini(id)}${copy?`<div class="journey-word">${escapeWord(w.en.trim())}</div><div class="fineprint">${escapeWord(w.ipa?'['+w.ipa+']':'音标待核对')}</div>${exampleMarkup(id)}`:''}<button class="btn smallbtn wide" onclick="speak(WORDS[data.journey.id].en)">♫ 听单词</button></div><div class="choice-bar"><button class="btn smallbtn ${j.writeMode==='tiles'?'primary':''}" onclick="flowSetMode('tiles')">乱序字母</button><button class="btn smallbtn ${j.writeMode==='keyboard'?'primary':''}" onclick="flowSetMode('keyboard')">逐字跟打</button></div>${j.writeMode==='keyboard'?`<div class="copy-mode-description">${copy?'看着英文拼写，字母位置会即时反馈。':'回忆刚才的英文，不看答案输入。'}</div><div id="typing-guide">${typingGuideMarkup(j.typed||'',copy)}</div><input class="inputword" id="wordInput" aria-label="输入英语单词" placeholder="点击输入字母" value="${escapeWord(j.typed||'')}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" oninput="flowTypingInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();flowCheckKeyboard()}"><div class="typo-note" id="typing-status">拼写正确后自动继续</div><button class="btn wide" onclick="flowCheckKeyboard()">检查拼写 →</button>`:drawTiles()}<div id="flow-feedback">${j.feedback||''}</div><p class="flow-caption">${copy?'完成后自动继续；隔几个词还会重新遇见它。':'答完直接接着学；错词会隔开重练。'}</p><button class="btn ghost wide" onclick="flowReveal()">需要提示 · 查看答案</button></div>`;refresh()}
+function renderFlowCopy(){
+ const j=data.journey, id=j.id, w=WORDS[id], copy=j.phase==='copy';
+ if(!j.writeMode)j.writeMode=data.copyPreference||'tiles';
+ const wordAudio='<button type="button" class="btn flow-audio" aria-label="听单词发音" onclick="speak(WORDS[data.journey.id].en)">♫</button>';
+ const wordCard=copy?`<div class="journey-card">
+   <div class="flow-lesson-row">
+     <div><div class="journey-word">${escapeWord(w.en.trim())}</div><div class="fineprint">${escapeWord(w.ipa?'['+w.ipa+']':'音标待核对')}</div></div>
+     ${wordAudio}
+   </div>
+   <div class="flow-word-meaning">${posMini(id)} <b>${escapeWord(w.cn)}</b></div>
+ </div>${studyDetailMarkup(id)}`:`<div class="journey-card">
+   <span class="tag">不看答案 · 穿插抽查</span><div class="journey-cn">${escapeWord(w.cn)}</div>${posMini(id)}${wordAudio}
+ </div>`;
+ const keyboard=`<div id="typing-guide">${typingGuideMarkup(j.typed||'',copy)}</div>
+   <input class="inputword" id="wordInput" aria-label="输入英语单词" placeholder="点击输入字母" value="${escapeWord(j.typed||'')}" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" oninput="flowTypingInput(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();flowCheckKeyboard()}">
+   <div class="typo-note" id="typing-status" aria-live="polite">拼写正确后自动继续</div>
+   <button class="btn wide" onclick="flowCheckKeyboard()">检查拼写</button>`;
+ $('app').innerHTML=`<div class="card flow-lesson">
+   <div class="kicker">${copy?`新词 · 第 ${id+1} / ${WORDS.length} 词`:'课堂抽查 · 拼写'}</div>
+   ${introProgress()}
+   ${wordCard}
+   <div class="choice-bar" aria-label="拼写方式">
+     <button class="btn smallbtn ${j.writeMode==='tiles'?'primary':''}" aria-pressed="${j.writeMode==='tiles'}" onclick="flowSetMode('tiles')">乱序字母</button>
+     <button class="btn smallbtn ${j.writeMode==='keyboard'?'primary':''}" aria-pressed="${j.writeMode==='keyboard'}" onclick="flowSetMode('keyboard')">逐字跟打</button>
+   </div>
+   ${j.writeMode==='keyboard'?keyboard:drawTiles()}
+   <div id="flow-feedback" aria-live="polite">${j.feedback||''}</div>
+   <div class="grid flow-lesson-actions">
+     <button class="btn ghost" onclick="flowReveal()">查看答案</button>
+     <button class="btn ghost" onclick="navigate('study')">暂停并保存</button>
+   </div>
+ </div>`;
+ refresh();
+}
 function renderFlowQuiz(){const j=data.journey,q=j.question,id=j.id,w=WORDS[id];if(q.type==='spell'){renderFlowCopy();return}const enZh=q.type==='enZh';$('app').innerHTML=`<div class="card"><div class="kicker">03 / QUICK CHECK</div>${introProgress()}<div class="row"><h2 style="margin:5px 0">来做个小抽查</h2><span class="tag">${enZh?'英 → 中':'中 → 英'}</span></div><p class="muted">这是系统插入的复习，完成后自动进入下一张学习卡。</p><div class="journey-card"><div class="journey-word" style="font-size:${enZh?40:23}px">${escapeWord(enZh?w.en.trim():w.cn)}</div>${enZh?`<button class="btn smallbtn wide" onclick="speak(WORDS[data.journey.id].en)">♫ 听发音</button>`:''}</div>${q.options.map(i=>`<button class="btn option" onclick="flowAnswer(${i})">${escapeWord(enZh?WORDS[i].cn.split('；')[0]:WORDS[i].en.trim())}</button>`).join('')}<button class="btn ghost wide" onclick="flowHint()">查看音标提示</button><div id="flow-hint">${j.hint?escapeWord(w.ipa||'音标待核对'):''}</div></div>`;refresh()}
 function renderQuestion(){const q=question,w=WORDS[q.id];$('app').innerHTML=`<div class="card"><div class="kicker">REVIEW SESSION</div><div class="row"><h2 style="margin:5px 0">单词回忆</h2><span class="tag">${q.pool==='due'?'到期复习':q.pool==='wrong'?'错词救援':q.pool==='round'?'整组复习':'额外抽查'}</span></div><p class="muted">请选择与英文匹配的中文释义。</p><div class="journey-card"><div class="word">${escapeWord(w.en.trim())}</div><button class="btn smallbtn wide" onclick="speak(WORDS[question.id].en)">♫ 聆听发音</button></div>${q.opt.map(i=>`<button class="btn option" onclick="${q.pool==='round'?'reviewRoundAnswer':'answer'}(${i})" ${answered?'disabled':''}>${escapeWord(WORDS[i].cn.split('；')[0])}</button>`).join('')}<button class="btn ghost wide" onclick="showHint()">查看提示 · 音标</button><div id="hint"></div><div id="result"></div><button class="btn ghost wide" onclick="navigate('study')">结束专项练习</button></div>`}
 function map(){$('app').innerHTML=`<div class="card hero-card"><div class="kicker">02 / EXPLORATION</div><div class="row"><h2 style="font-size:27px;margin:0">沿着小岛，去冒险。</h2><span class="tag">CHAPTER 01</span></div><p class="muted">学习带来行动力。掷骰探索新地点，或使用积累的步数自由前进。</p><div class="map-scene"><div class="row"><span class="pill">◇ 16 个地点</span><span class="pill">位置 ${data.pos+1}/16</span></div><div style="font-size:50px;text-align:center;padding:8px">🏞️　🛤️　🏰</div></div></div><div class="card"><div class="row"><b>岛屿探索地图</b><span class="tag">${TILES[data.pos][1]}</span></div><div class="map">${TILES.map((c,i)=>`<div class="tile ${data.pos===i?'current':''}"><div class="num">${i+1}</div><div class="emoji">${data.pos===i?'🧭':c[0]}</div><div class="name">${escapeWord(c[1])}</div></div>`).join('')}</div><div class="soft" aria-live="polite">${escapeWord(data.log)}</div><div class="grid"><div class="metric"><strong>${data.dice}</strong><small>可用骰子</small></div><div class="metric"><strong>${data.steps}</strong><small>学习步数</small></div></div><button class="btn primary wide" onclick="rollDice()" ${data.dice<1?'disabled':''}>◇ 掷骰 · 随机前进1—3格</button><button class="btn wide" onclick="freeMove()" ${data.steps<2?'disabled':''}>↟ 消耗2步 · 自由前进1格</button><p class="fineprint">答对可获得学习步数；每3次正确练习获得一次骰子机会。探索奖励不会改变词汇记忆状态。</p></div>`;refresh()}

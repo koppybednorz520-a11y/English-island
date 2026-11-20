@@ -55,3 +55,50 @@
 
 .rpg-dicebar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 12px 14px}.rpg-dicebar button{border:1px solid var(--line);background:var(--soft);padding:11px 5px;border-radius:11px;color:var(--text);font-size:11.5px;font-weight:740;min-height:41px}.rpg-dicebar button:disabled{opacity:.45}.rpg-dicebar button:active{transform:scale(.99)}
 
+/* Vocabulary and spelling share one learning card. */
+.flow-lesson .journey-card {
+  text-align: left;
+  margin: 8px 0;
+  padding: 12px;
+}
+.flow-lesson .journey-word {
+  margin: 0;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+}
+.flow-lesson-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.flow-lesson-row > div { min-width: 0; overflow-wrap: anywhere; }
+.flow-lesson .flow-audio {
+  flex: 0 0 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+}
+.flow-word-meaning { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.flow-lesson .lesson-card { margin: 8px 0; padding: 10px 12px 4px; }
+.flow-lesson .example-en { font-size: 17px; margin-bottom: 3px; }
+.flow-lesson .example-cn { margin: 0; }
+.flow-lesson .grammar-toggle { min-height: 44px; margin: 0; padding: 4px 8px; }
+.flow-lesson .choice-bar { margin: 8px 0 4px; }
+.flow-lesson .choice-bar button,
+.flow-lesson .grid button { min-height: 44px; margin: 0; }
+.flow-lesson .slots,
+.flow-lesson .letter-bank { margin: 8px 0; }
+.flow-lesson-actions { margin-top: 4px; }
+
+@media (max-width: 600px) {
+  .wrap:has(.flow-lesson) { padding-inline: 10px; padding-bottom: calc(82px + env(safe-area-inset-bottom)); }
+  .wrap:has(.flow-lesson) .top { padding-block: 6px; }
+  .wrap:has(.flow-lesson) .quick-stats { padding-block: 4px; }
+  .flow-lesson.card { margin-block: 4px; padding: 10px; }
+  .flow-lesson .bar { margin-block: 5px; }
+  .flow-lesson .journey-word { font-size: clamp(25px, 8vw, 38px); }
+  .flow-lesson .letter-bank { gap: 4px; }
+  .flow-lesson .letter-tile { min-width: 34px; }
+  .flow-lesson .slot { min-width: 20px; min-height: 32px; }
+}

@@ -276,8 +276,93 @@ function renderQuestion(){const q=question,w=WORDS[q.id];
     renderExtraSpelling();
     return;
   }
+  if (q.pool === 'random' && !q.showMeaningChoices) {
+    renderExtraChinese();
+    return;
+  }
   const choose = q.pool === 'random' ? 'chooseExtraMeaning' : q.pool === 'round' ? 'reviewRoundAnswer' : 'answer';
   $('app').innerHTML=`<div class="card"><div class="kicker">REVIEW SESSION</div><div class="row"><h2 style="margin:5px 0">单词回忆</h2><span class="tag">${q.pool==='due'?'到期复习':q.pool==='wrong'?'错词救援':q.pool==='round'?'整组复习':'额外抽查'}</span></div><p class="muted">${q.pool === 'random' ? '先选中文释义，再凭记忆拼写英文。' : '请选择与英文匹配的中文释义。'}</p><div class="journey-card"><div class="word">${escapeWord(w.en.trim())}</div><button class="btn smallbtn wide" onclick="speak(WORDS[question.id].en)">♫ 聆听发音</button></div>${q.opt.map(i=>`<button class="btn option" onclick="${choose}(${i})" ${answered?'disabled':''}>${escapeWord(WORDS[i].cn.split('；')[0])}</button>`).join('')}<button class="btn ghost wide" onclick="showHint()">查看提示 · 音标</button><div id="hint"></div><div id="result"></div><button class="btn ghost wide" onclick="navigate('study')">结束专项练习</button></div>`}
+// The word list uses semicolons for different senses. Add everyday equivalents
+// without treating a substring of a meaning (e.g. 成 in 成功) as an answer.
+const extraChineseAliases = {
+  personal: '私有的；个人专属的', present: '现在；现在的；目前；目前的；出席的；在场的；赠送；展示',
+  tie: '领带；系上；打结', still: '还是；依然；不动的', offer: '给予；主动提出',
+  improve: '改进；提升', expect: '期望；预期', produce: '制造；产生',
+  addition: '添加；增加物', cause: '导致；起因', wonder: '好奇；惊奇',
+  manage: '设法做到；经营', realize: '认识到；察觉到', valuable: '有价值的；宝贵的',
+  directly: '径直；直接', underline: '在下方画线；在下面画线；加下划线',
+  sensitive: '灵敏的', complete: '齐全的；结束', lead: '引领；领导', courageous: '有勇气的'
+};
+
+function matchesExtraChinese(word, input) {
+  const parts = text => text.normalize('NFKC').replace(/\s+/g, '')
+    .replace(/[。.!！?？]+$/, '').split(/[;,、/]/).filter(Boolean);
+  const en = word.en.trim().toLowerCase();
+  const glosses = [word.cn, READER_DICT[en], extraChineseAliases[en]].filter(Boolean);
+  const accepted = new Set(glosses.flatMap(parts));
+  // Accept an omitted adjective/adverb ending on multi-character stems.
+  for (const meaning of [...accepted]) {
+    const optionalEnding = meaning.endsWith('的') || (en.endsWith('ly') && meaning.endsWith('地'));
+    if (meaning.length >= 3 && optionalEnding) accepted.add(meaning.slice(0, -1));
+  }
+  const submitted = parts(input);
+  return submitted.length > 0 && submitted.every(meaning => accepted.has(meaning));
+}
+
+function renderExtraChinese() {
+  const word = WORDS[question.id];
+  $('app').innerHTML = `<div class="card extra-review">
+    <div class="row"><h2>写中文释义</h2><span class="tag">额外抽查</span></div>
+    <div class="journey-card extra-prompt"><div class="word" lang="en">${escapeWord(word.en.trim())}</div>
+      <button class="btn smallbtn wide" onclick="speak(WORDS[question.id].en)">♫ 听发音</button></div>
+    <label class="extra-word-label" for="extra-chinese">这个词是什么意思？写出一个中文意思就好。</label>
+    <input id="extra-chinese" class="inputword" lang="zh-CN" type="text" inputmode="text"
+      enterkeyhint="done" autocomplete="off" spellcheck="false" aria-describedby="extra-note">
+    <p class="fineprint" id="extra-note" role="status"></p>
+    <button type="button" class="btn primary wide" id="check-chinese">检查中文</button>
+    <button type="button" class="btn wide" onclick="showExtraMeaningChoices()">用选项作答</button>
+    <button class="btn ghost wide" onclick="navigate('study')">结束专项练习</button></div>`;
+  const input = $('extra-chinese');
+  let composing = false;
+  let compositionEndedAt = -Infinity;
+  input.addEventListener('compositionstart', () => { composing = true; });
+  input.addEventListener('compositionend', () => {
+    composing = false;
+    compositionEndedAt = performance.now();
+  });
+  function check() {
+    if (composing || !input.isConnected) return;
+    const value = input.value.trim();
+    if (value && matchesExtraChinese(word, value)) {
+      question.writtenChinese = value;
+      chooseExtraMeaning(question.id);
+      return;
+    }
+    $('extra-note').textContent = value
+      ? '词库还没匹配到这个说法。可以换个说法，或点「用选项作答」。'
+      : '先写一个中文意思吧。';
+    input.focus();
+  }
+  input.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' || composing || event.isComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    if (!event.repeat && performance.now() - compositionEndedAt > 80) check();
+  });
+  $('check-chinese').addEventListener('click', check);
+  input.focus();
+}
+
+function showExtraMeaningChoices() {
+  if (!question || question.pool !== 'random' || question.meaningCorrect !== undefined) return;
+  question.showMeaningChoices = true;
+  renderQuestion();
+}
+
+function extraMeaningFeedback(q) {
+  if (q.writtenChinese) return '中文写对了';
+  return q.meaningCorrect ? '释义选对了' : '释义需要复习';
+}
+
 function chooseExtraMeaning(id) {
   if (!question || question.pool !== 'random' || question.meaningCorrect !== undefined) return;
   question.meaningCorrect = id === question.id;
@@ -289,7 +374,7 @@ function renderExtraSpelling() {
   const q = question, w = WORDS[q.id];
   let content;
   if (answered) {
-    const meaning = q.meaningCorrect ? '释义选对了' : '释义需要复习';
+    const meaning = extraMeaningFeedback(q);
     const spelling = q.spellingCorrect ? '拼写正确' : '拼写需要再练';
     content = `<div class="feedback ${q.meaningCorrect && q.spellingCorrect ? '' : 'bad'}" role="status">
       <b>${meaning} · ${spelling}</b>
@@ -299,7 +384,7 @@ function renderExtraSpelling() {
     ${!q.spellingCorrect ? '<button class="btn wide" onclick="retryExtraSpelling()">再默写一次</button>' : ''}
     <button class="btn primary wide" onclick="startQuiz('random')">下一词</button>`;
   } else {
-    const meaning = q.meaningCorrect ? '释义选对了' : '记住这个释义';
+    const meaning = q.meaningCorrect ? extraMeaningFeedback(q) : '记住这个释义';
     content = `<div class="journey-card extra-prompt">
       <span class="fineprint">${meaning}</span>
       <div class="journey-cn">${escapeWord(w.cn)}</div>

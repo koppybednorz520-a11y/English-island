@@ -127,3 +127,11 @@
   border-radius: 50%;
 }
 .lesson-start:active { transform: translateY(1px); }
+
+.extra-review h2 { margin: 0; }
+.extra-review .extra-prompt { margin: 12px 0; padding: 14px; }
+.extra-review .journey-cn { margin: 4px 0 0; }
+.extra-word-label { display: block; margin-bottom: 6px; font-weight: 600; }
+.extra-review .inputword { scroll-margin: 12px; }
+.extra-review #extra-note:empty { display: none; }
+.extra-review .feedback { overflow-wrap: anywhere; }

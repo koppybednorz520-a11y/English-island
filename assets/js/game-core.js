@@ -60,7 +60,27 @@ function startQuiz(pool){const id=pickId(pool);if(id===undefined){study();return
 function newQuestion(id,pool){tab='study';answered=false;hinted=false;const w=WORDS[id];let other=shuffle(WORDS.map((_,i)=>i).filter(i=>i!==id)).slice(0,3);let opt=shuffle([id,...other]);question={id,pool,opt};renderQuestion()}
 function renderQuestion(){const q=question,w=WORDS[q.id];$('app').innerHTML=`<div class="card"><div class="row"><b>🪄 魔法记忆测试</b><span class="tag">${q.pool==='learn'?'新词':q.pool==='due'?'到期复习':q.pool==='wrong'?'错词救援':'随机抽查'}</span></div><p class="muted">请选择英文单词的正确中文含义</p><div class="word">${w.en}</div><button class="btn wide" onclick="speak(WORDS[question.id].en)">🔊 听英语发音</button>${q.opt.map(i=>`<button class="btn option" onclick="answer(${i})" ${answered?'disabled':''}>${WORDS[i].cn.split('；')[0]}</button>`).join('')}<button class="btn wide" onclick="showHint()">💡 查看提示（音标）</button><div id="hint"></div><div id="result"></div><button class="btn wide" onclick="navigate('study')">返回学习菜单</button></div>`}
 function showHint(){hinted=true;$('hint').innerHTML='<div class="soft">'+(WORDS[question.id].ipa||'本词音标未核对，可点击发音')+'</div>'}
-function answer(i){if(answered)return;answered=true;const q=question,w=WORDS[q.id],correct=i===q.id;const rec=data.learned[q.id]||{date:day(),stage:0,errors:0};rec.last=day();if(correct){rec.stage=Math.min(5,rec.stage+1);rec.due=later([1,2,4,7,15,30][rec.stage]);data.steps++;data.stars+=hinted?1:3;data.quizCount++;if(data.difficult[q.id])delete data.difficult[q.id]}else{rec.errors++;rec.stage=0;rec.due=later(1);data.difficult[q.id]=(data.difficult[q.id]||0)+1}data.learned[q.id]=rec;save();renderQuestion();$('result').innerHTML=`<div class="feedback ${correct?'':'bad'}"><b>${correct?'🎉 回答正确！+1步，+'+(hinted?1:3)+'星星':'🌱 答错啦，已加入错词循环'}</b><p>${w.en}：${w.cn}</p>${correct&&data.quizCount%3===0?'🎲 你还获得了1次掷骰机会！':''}</div><button class="btn primary wide" onclick="${correct?'startQuiz(\'random\')':'newQuestion('+q.id+',\'wrong\')'}">${correct?'继续随机抽查':'重新认识并练习'}</button>`;refresh()}
+function scoreReviewWord(id, correct) {
+  const rec = data.learned[id] || {date:day(), stage:0, errors:0};
+  rec.last = day();
+  if (correct) {
+    rec.stage = Math.min(5, (rec.stage || 0) + 1);
+    rec.due = later([1, 2, 4, 7, 15, 30][rec.stage]);
+    data.steps++;
+    data.stars += hinted ? 1 : 3;
+    data.quizCount++;
+    if (data.quizCount % 3 === 0) data.dice++;
+    delete data.difficult[id];
+  } else {
+    rec.errors = (rec.errors || 0) + 1;
+    rec.stage = 0;
+    rec.due = later(1);
+    data.difficult[id] = (data.difficult[id] || 0) + 1;
+  }
+  data.learned[id] = rec;
+  save();
+}
+function answer(i){if(answered)return;answered=true;const q=question,w=WORDS[q.id],correct=i===q.id;scoreReviewWord(q.id, correct);renderQuestion();$('result').innerHTML=`<div class="feedback ${correct?'':'bad'}"><b>${correct?'🎉 回答正确！+1步，+'+(hinted?1:3)+'星星':'🌱 答错啦，已加入错词循环'}</b><p>${w.en}：${w.cn}</p>${correct&&data.quizCount%3===0?'🎲 你还获得了1次掷骰机会！':''}</div><button class="btn primary wide" onclick="${correct?'startQuiz(\'random\')':'newQuestion('+q.id+',\'wrong\')'}">${correct?'继续随机抽查':'重新认识并练习'}</button>`;refresh()}
 function land(){const c=TILES[data.pos];let extra='';if([3,12,14].includes(data.pos)){data.stars+=5;extra='🎁 找到5颗星星！'}else if([1,4,5,8].includes(data.pos)){extra='📚 这里有学习挑战，可以到学习课堂完成。'}else if([7,10].includes(data.pos)){extra='✨ 遇到魔法伙伴，可以去小屋互动。'}else extra='🌸 新风景已解锁！';data.log='抵达「'+c[1]+'」！'+extra;save()}
 function rollDice(){if(data.dice<=0){alert('先完成3道正确练习，获得骰子机会吧！');return}data.dice--;const n=1+Math.floor(Math.random()*3);data.pos=(data.pos+n)%TILES.length;land();map()}
 function freeMove(){if(data.steps<2){alert('需要2个学习步数才能自由前进1格');return}data.steps-=2;data.pos=(data.pos+1)%TILES.length;land();map()}
@@ -185,8 +205,7 @@ function flowReviewResult(correct,revealed=false){const j=data.journey;if(!j||j.
 
 // Separate from version 6's saved data. Initial dice opportunity for testing, not an earned reward.
 if(data.lastVisit===day()&&data.quizCount===0&&data.dice===0&&!existed){data.dice=1;data.log='🎁 新手试玩礼物：免费骰子1次！';}
-// Earn one die for every third correct answer; triggered via calculated total wins.
-const _answer=answer;answer=function(i){const before=data.quizCount;_answer(i);if(data.quizCount>before&&data.quizCount%3===0){data.dice++;save();refresh()}};
+
 
 /* 8.0 visual layer – preserved vocabulary and 7.3 study / timing engine */
 const THEME_KEY='ayu_island_theme_v8';let islandTheme='sage';
@@ -252,7 +271,81 @@ function renderFlowCopy(){
  refresh();
 }
 function renderFlowQuiz(){const j=data.journey,q=j.question,id=j.id,w=WORDS[id];if(q.type==='spell'){renderFlowCopy();return}const enZh=q.type==='enZh';$('app').innerHTML=`<div class="card"><div class="kicker">03 / QUICK CHECK</div>${introProgress()}<div class="row"><h2 style="margin:5px 0">来做个小抽查</h2><span class="tag">${enZh?'英 → 中':'中 → 英'}</span></div><p class="muted">这是系统插入的复习，完成后自动进入下一张学习卡。</p><div class="journey-card"><div class="journey-word" style="font-size:${enZh?40:23}px">${escapeWord(enZh?w.en.trim():w.cn)}</div>${enZh?`<button class="btn smallbtn wide" onclick="speak(WORDS[data.journey.id].en)">♫ 听发音</button>`:''}</div>${q.options.map(i=>`<button class="btn option" onclick="flowAnswer(${i})">${escapeWord(enZh?WORDS[i].cn.split('；')[0]:WORDS[i].en.trim())}</button>`).join('')}<button class="btn ghost wide" onclick="flowHint()">查看音标提示</button><div id="flow-hint">${j.hint?escapeWord(w.ipa||'音标待核对'):''}</div></div>`;refresh()}
-function renderQuestion(){const q=question,w=WORDS[q.id];$('app').innerHTML=`<div class="card"><div class="kicker">REVIEW SESSION</div><div class="row"><h2 style="margin:5px 0">单词回忆</h2><span class="tag">${q.pool==='due'?'到期复习':q.pool==='wrong'?'错词救援':q.pool==='round'?'整组复习':'额外抽查'}</span></div><p class="muted">请选择与英文匹配的中文释义。</p><div class="journey-card"><div class="word">${escapeWord(w.en.trim())}</div><button class="btn smallbtn wide" onclick="speak(WORDS[question.id].en)">♫ 聆听发音</button></div>${q.opt.map(i=>`<button class="btn option" onclick="${q.pool==='round'?'reviewRoundAnswer':'answer'}(${i})" ${answered?'disabled':''}>${escapeWord(WORDS[i].cn.split('；')[0])}</button>`).join('')}<button class="btn ghost wide" onclick="showHint()">查看提示 · 音标</button><div id="hint"></div><div id="result"></div><button class="btn ghost wide" onclick="navigate('study')">结束专项练习</button></div>`}
+function renderQuestion(){const q=question,w=WORDS[q.id];
+  if (q.pool === 'random' && q.meaningCorrect !== undefined) {
+    renderExtraSpelling();
+    return;
+  }
+  const choose = q.pool === 'random' ? 'chooseExtraMeaning' : q.pool === 'round' ? 'reviewRoundAnswer' : 'answer';
+  $('app').innerHTML=`<div class="card"><div class="kicker">REVIEW SESSION</div><div class="row"><h2 style="margin:5px 0">单词回忆</h2><span class="tag">${q.pool==='due'?'到期复习':q.pool==='wrong'?'错词救援':q.pool==='round'?'整组复习':'额外抽查'}</span></div><p class="muted">${q.pool === 'random' ? '先选中文释义，再凭记忆拼写英文。' : '请选择与英文匹配的中文释义。'}</p><div class="journey-card"><div class="word">${escapeWord(w.en.trim())}</div><button class="btn smallbtn wide" onclick="speak(WORDS[question.id].en)">♫ 聆听发音</button></div>${q.opt.map(i=>`<button class="btn option" onclick="${choose}(${i})" ${answered?'disabled':''}>${escapeWord(WORDS[i].cn.split('；')[0])}</button>`).join('')}<button class="btn ghost wide" onclick="showHint()">查看提示 · 音标</button><div id="hint"></div><div id="result"></div><button class="btn ghost wide" onclick="navigate('study')">结束专项练习</button></div>`}
+function chooseExtraMeaning(id) {
+  if (!question || question.pool !== 'random' || question.meaningCorrect !== undefined) return;
+  question.meaningCorrect = id === question.id;
+  renderExtraSpelling();
+  $('extra-word').focus();
+}
+
+function renderExtraSpelling() {
+  const q = question, w = WORDS[q.id];
+  let content;
+  if (answered) {
+    const meaning = q.meaningCorrect ? '释义选对了' : '释义需要复习';
+    const spelling = q.spellingCorrect ? '拼写正确' : '拼写需要再练';
+    content = `<div class="feedback ${q.meaningCorrect && q.spellingCorrect ? '' : 'bad'}" role="status">
+      <b>${meaning} · ${spelling}</b>
+      <p><strong lang="en">${escapeWord(w.en.trim())}</strong> · ${escapeWord(w.cn)}</p>
+      ${!q.spellingCorrect ? `<p>你写的是 <span lang="en">${escapeWord(q.typed)}</span></p>` : ''}
+    </div>
+    ${!q.spellingCorrect ? '<button class="btn wide" onclick="retryExtraSpelling()">再默写一次</button>' : ''}
+    <button class="btn primary wide" onclick="startQuiz('random')">下一词</button>`;
+  } else {
+    const meaning = q.meaningCorrect ? '释义选对了' : '记住这个释义';
+    content = `<div class="journey-card extra-prompt">
+      <span class="fineprint">${meaning}</span>
+      <div class="journey-cn">${escapeWord(w.cn)}</div>
+    </div>
+    <form onsubmit="event.preventDefault();submitExtraSpelling()">
+      <label class="extra-word-label" for="extra-word">看中文，写出英文单词</label>
+      <input id="extra-word" class="inputword" lang="en" type="text" inputmode="text" enterkeyhint="done"
+        autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+      <p class="fineprint" id="extra-note" role="status"></p>
+      <button class="btn primary wide" type="submit">检查拼写</button>
+    </form>
+    <div class="grid"><button class="btn smallbtn" onclick="speak(WORDS[question.id].en)">♫ 听发音</button>
+    <button class="btn smallbtn" onclick="showHint()">音标提示</button></div><div id="hint" role="status"></div>`;
+  }
+  $('app').innerHTML = `<div class="card extra-review"><div class="row"><h2>单词默写</h2><span class="tag">额外抽查</span></div>
+    ${content}<button class="btn ghost wide" onclick="navigate('study')">结束专项练习</button></div>`;
+}
+
+function submitExtraSpelling() {
+  const q = question;
+  if (!q || q.pool !== 'random' || q.meaningCorrect === undefined || answered) return;
+  const input = $('extra-word');
+  const typed = input.value.trim();
+  if (!typed) {
+    $('extra-note').textContent = '先输入英文单词。';
+    input.focus();
+    return;
+  }
+  answered = true;
+  q.spellingCorrect = typed.toLowerCase() === WORDS[q.id].en.trim().toLowerCase();
+  q.typed = typed;
+  if (!q.scored) {
+    scoreReviewWord(q.id, q.meaningCorrect && q.spellingCorrect);
+    q.scored = true;
+  }
+  renderExtraSpelling();
+  refresh();
+}
+
+function retryExtraSpelling() {
+  if (!question || question.pool !== 'random' || !answered || question.spellingCorrect) return;
+  answered = false;
+  renderExtraSpelling();
+  $('extra-word').focus();
+}
+
 function map(){$('app').innerHTML=`<div class="card hero-card"><div class="kicker">02 / EXPLORATION</div><div class="row"><h2 style="font-size:27px;margin:0">沿着小岛，去冒险。</h2><span class="tag">CHAPTER 01</span></div><p class="muted">学习带来行动力。掷骰探索新地点，或使用积累的步数自由前进。</p><div class="map-scene"><div class="row"><span class="pill">◇ 16 个地点</span><span class="pill">位置 ${data.pos+1}/16</span></div><div style="font-size:50px;text-align:center;padding:8px">🏞️　🛤️　🏰</div></div></div><div class="card"><div class="row"><b>岛屿探索地图</b><span class="tag">${TILES[data.pos][1]}</span></div><div class="map">${TILES.map((c,i)=>`<div class="tile ${data.pos===i?'current':''}"><div class="num">${i+1}</div><div class="emoji">${data.pos===i?'🧭':c[0]}</div><div class="name">${escapeWord(c[1])}</div></div>`).join('')}</div><div class="soft" aria-live="polite">${escapeWord(data.log)}</div><div class="grid"><div class="metric"><strong>${data.dice}</strong><small>可用骰子</small></div><div class="metric"><strong>${data.steps}</strong><small>学习步数</small></div></div><button class="btn primary wide" onclick="rollDice()" ${data.dice<1?'disabled':''}>◇ 掷骰 · 随机前进1—3格</button><button class="btn wide" onclick="freeMove()" ${data.steps<2?'disabled':''}>↟ 消耗2步 · 自由前进1格</button><p class="fineprint">答对可获得学习步数；每3次正确练习获得一次骰子机会。探索奖励不会改变词汇记忆状态。</p></div>`;refresh()}
 function companion(){$('app').innerHTML=`<div class="card hero-card"><div class="kicker">03 / YOUR COMPANION</div><h2 style="font-size:28px">小屋里的日常。</h2><p class="muted">偶尔学单词，也可以什么都不做，只来看看星团。</p><div class="companion-scene"><span class="costume">${data.costume}</span><div class="cat">🐈</div><b>星团 · 魔法伙伴</b><p>${escapeWord(companionLine)}</p></div></div><div class="card"><div class="kicker">COMPANION STATUS</div><div class="row"><b>心情</b><span class="fineprint">${data.mood}%</span></div><div class="soft-progress"><span style="width:${data.mood}%"></span></div><div class="row"><b>活力</b><span class="fineprint">${data.energy}%</span></div><div class="soft-progress"><span style="width:${data.energy}%"></span></div><div class="grid"><button class="btn" onclick="interact('talk')">◇ 聊聊天</button><button class="btn" onclick="interact('play')">◈ 一起玩</button><button class="btn" onclick="interact('study')">▤ 一起学习</button><button class="btn" onclick="interact('rest')">☾ 休息一下</button></div></div><div class="card flat"><div class="row"><b>衣帽与装饰</b><span class="tag">★ ${data.stars}星星</span></div><p class="muted">装饰通过学习获得的星星解锁，不用购买。</p><button class="btn wide" onclick="buy()">${data.unlocked.includes('🧢')?'戴上小帽子':'15星星 · 解锁小帽子'}</button><button class="btn wide" onclick="data.costume='🎀';companion()">换回樱花蝴蝶结</button><p class="fineprint">小屋使用预设互动台词，离线也能操作；它不是AI实时聊天。</p></div>`;refresh()}
 let libraryLimit=30;

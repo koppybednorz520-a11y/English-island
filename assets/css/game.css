@@ -135,3 +135,12 @@
 .extra-review .inputword { scroll-margin: 12px; }
 .extra-review #extra-note:empty { display: none; }
 .extra-review .feedback { overflow-wrap: anywhere; }
+
+.story-paper { margin: .85rem 0; padding: .85rem 1rem; color: var(--text); border: 1px solid var(--line); border-inline-start: 4px solid var(--accent); border-radius: 7px; background: var(--soft); }
+.story-paper small { display: block; padding-bottom: .4rem; font-size: .86rem; color: var(--muted); border-bottom: 1px dashed var(--line); }
+.story-paper [lang="en"] { margin: .5rem 0 .1rem; font: 1.18rem/1.45 Georgia, serif; overflow-wrap: anywhere; }
+.story-library-card { border-inline-start-style: double; border-inline-start-width: 6px; }
+.story-scene .rpg-actions label { font-weight: 600; }
+.story-scene summary, .story-other summary, .story-paper summary { cursor:pointer; padding-block:.55rem; }
+.story-other { margin-top: 1rem; border-top: 1px solid var(--line); }
+.story-scene #story-feedback:empty { display: none; }

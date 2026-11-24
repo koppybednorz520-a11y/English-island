@@ -30,26 +30,132 @@ function pickVoice(){readVoices();if(!availableVoices.length)return null;
  return n;}
  return availableVoices.slice().sort((a,b)=>score(b)-score(a))[0]||null;
 }
-function speak(w){if(!('speechSynthesis' in window)){alert('当前浏览器不支持英语语音，请试试 Chrome');return}
- try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(String(w||'').trim());u.lang=voiceConfig.accent;u.rate=voiceConfig.rate;u.pitch=1;u.volume=1;const voice=pickVoice();if(voice){u.voice=voice;u.lang=voice.lang||voiceConfig.accent;}speechSynthesis.speak(u);}
- catch(e){alert('本机朗读未启动。可以试试 Chrome 或检查手机语音设置。')}
+let voiceRequest = 0;
+let voiceStartTimer;
+let currentUtterance;
+let retryRecording = '';
+const recordedVoice = 'island-mp3';
+
+function stopPronunciation() {
+  ++voiceRequest;
+  clearTimeout(voiceStartTimer);
+  const player = $('island-player');
+  if (player) {
+    player.onerror = null;
+    player.pause();
+  }
+  if (currentUtterance) {
+    currentUtterance.onstart = currentUtterance.onerror = currentUtterance.onend = null;
+    currentUtterance = null;
+    try { window.speechSynthesis.cancel(); } catch (_) {}
+  }
+  const notice = $('audio-notice');
+  if (notice) notice.hidden = true;
 }
+
+function audioNotice(message) {
+  const notice = $('audio-notice');
+  notice.textContent = message;
+  notice.hidden = false;
+}
+
+function speak(w) {
+  const text = String(w || '').trim();
+  if (!text) return;
+  stopPronunciation();
+  const request = voiceRequest;
+  const key = text.toLowerCase().replace(/\s+/g, ' ');
+  const clip = Object.prototype.hasOwnProperty.call(islandAudioClips, key) ? islandAudioClips[key] : '';
+  const voice = pickVoice();
+  const hasSpeech = !!window.speechSynthesis && typeof window.SpeechSynthesisUtterance === 'function';
+  let triedRecording = false, triedSystem = false;
+  function playRecording() {
+    if (request !== voiceRequest || triedRecording) return;
+    triedRecording = true;
+    retryRecording = key;
+    const player = $('island-player');
+    let failed = false;
+    function onFailure(error) {
+      if (request !== voiceRequest || failed) return;
+      failed = true;
+      player.onerror = null;
+      if (error && error.name === 'NotAllowedError') {
+        audioNotice('浏览器暂停了播放，请再点一次刚才的发音按钮。');
+      } else if (hasSpeech && !triedSystem) {
+        playSystem();
+      } else {
+        audioNotice('这段声音暂时没有播出来，请检查网络后再点一次发音。');
+      }
+    }
+    player.onerror = () => onFailure();
+    try {
+      player.src = './assets/audio/' + clip + '.mp3';
+      player.defaultPlaybackRate = player.playbackRate = voiceConfig.rate;
+      const playing = player.play();
+      if (playing) playing.then(() => {
+        if (request === voiceRequest) retryRecording = '';
+      }, onFailure);
+    } catch (err) { onFailure(err); }
+  }
+  function playSystem() {
+    if (request !== voiceRequest || triedSystem) return;
+    triedSystem = true;
+    let failed = false;
+    function onFailure() {
+      if (request !== voiceRequest || failed) return;
+      failed = true;
+      clearTimeout(voiceStartTimer);
+      if (currentUtterance) {
+        currentUtterance.onerror = currentUtterance.onstart = currentUtterance.onend = null;
+        currentUtterance = null;
+      }
+      try { window.speechSynthesis.cancel(); } catch (_) {}
+      if (clip && !triedRecording) playRecording();
+      else audioNotice('朗读未能启动，请再点一次发音。');
+    }
+    try {
+      const speech = new window.SpeechSynthesisUtterance(text);
+      currentUtterance = speech;
+      speech.lang = voice ? voice.lang : voiceConfig.accent;
+      if (voice) speech.voice = voice;
+      speech.rate = voiceConfig.rate;
+      speech.onstart = () => clearTimeout(voiceStartTimer);
+      speech.onend = () => {
+        if (request === voiceRequest) {
+          clearTimeout(voiceStartTimer);
+          currentUtterance = null;
+        }
+      };
+      speech.onerror = onFailure;
+      voiceStartTimer = setTimeout(onFailure, 2200);
+      window.speechSynthesis.speak(speech);
+    } catch (_) { onFailure(); }
+  }
+  const useRecording = voiceConfig.voiceURI === recordedVoice || retryRecording === key ||
+    !hasSpeech || !voice || (voiceConfig.voiceURI === 'auto' && voiceConfig.accent === 'en-US');
+  if (clip && useRecording) playRecording();
+  else if (hasSpeech) playSystem();
+  else if (clip) playRecording();
+  else audioNotice('这段文字暂时没有站内音频。');
+}
+
 function refreshVoicePicker(){const accent=document.getElementById('voice-accent'),picker=document.getElementById('voice-picker'),rate=document.getElementById('voice-rate'),label=document.getElementById('voice-rate-value'),status=document.getElementById('voice-availability');
  if(!picker)return;accent.value=voiceConfig.accent;rate.value=voiceConfig.rate;label.textContent=Number(voiceConfig.rate).toFixed(2)+'×';
- const list=readVoices();picker.textContent='';const auto=document.createElement('option');auto.value='auto';auto.textContent='✨ 自动选择英语音色';picker.appendChild(auto);
+ const list=readVoices();picker.textContent='';const auto=document.createElement('option');auto.value='auto';auto.textContent='自动选择';picker.appendChild(auto);
+ const builtIn=document.createElement('option');builtIn.value=recordedVoice;builtIn.textContent='站内美式发音 · MP3';picker.appendChild(builtIn);
  list.forEach(v=>{const opt=document.createElement('option');opt.value=v.voiceURI;opt.textContent=(v.name||'英语声音')+' · '+v.lang;picker.appendChild(opt)});
- picker.value=list.some(v=>v.voiceURI===voiceConfig.voiceURI)?voiceConfig.voiceURI:'auto';
- status.textContent=list.length?`已找到 ${list.length} 种英语音色。点击试听，选择你喜欢的声音。`:'未读到英语音色列表；浏览器可能只提供默认合成音，建议换 Chrome 或检查系统语音包。';
+ picker.value=voiceConfig.voiceURI===recordedVoice||list.some(v=>v.voiceURI===voiceConfig.voiceURI)?voiceConfig.voiceURI:'auto';
+ status.textContent=picker.value===recordedVoice || (picker.value==='auto' && voiceConfig.accent==='en-US') || !list.length ? '当前使用站内美式发音，可以调节语速。' : '当前使用设备英语声音，无法启动时会尝试站内美式发音。';
 }
 function openVoiceSettings(){const overlay=document.getElementById('voice-overlay');overlay.classList.add('open');refreshVoicePicker()}
 function closeVoiceSettings(){document.getElementById('voice-overlay').classList.remove('open');saveVoice()}
 function updateVoiceAccent(v){voiceConfig.accent=v;voiceConfig.voiceURI='auto';saveVoice();refreshVoicePicker()}
-function updateVoiceChoice(v){voiceConfig.voiceURI=v;saveVoice()}
+function updateVoiceChoice(v){voiceConfig.voiceURI=v;saveVoice();refreshVoicePicker()}
 function updateVoiceRate(v){voiceConfig.rate=Math.max(0.75,Math.min(1.15,Number(v)||0.9));document.getElementById('voice-rate-value').textContent=voiceConfig.rate.toFixed(2)+'×';saveVoice()}
 if('speechSynthesis' in window){try{speechSynthesis.addEventListener('voiceschanged',()=>{if(document.getElementById('voice-overlay').classList.contains('open'))refreshVoicePicker()})}catch(e){}}
 
 function refresh(){ $('stats').textContent='⭐ '+data.stars+' · 👣 '+data.steps;['home','study','map','companion'].forEach(t=>$('nav-'+t).classList.toggle('active',tab===t));save()}
-function navigate(t){if(flowTimer)clearTimeout(flowTimer);tab=t;question=null;answered=false;draw();scrollTo(0,0)}
+function navigate(t){stopPronunciation();if(flowTimer)clearTimeout(flowTimer);tab=t;question=null;answered=false;draw();scrollTo(0,0)}
 function draw(){refresh();if(tab==='home')home();else if(tab==='study')study();else if(tab==='map')map();else companion()}
 function home(){$('app').innerHTML=`<div class="card hero"><div class="character">🏰🌸🐱</div><h2>魔法冒险 · 7.3 自然发音</h2><p class="muted">认识 → 跟打或乱序拼写 → 穿插抽查 → 下一词，一路连贯学习；还可以和伙伴探索地图。</p></div><div class="card"><div class="row"><b>✨ 今日学习任务</b><span class="tag">${fresh()}/${data.daily} 新词</span></div><div class="bar"><div class="fill" style="width:${Math.min(100,100*fresh()/data.daily)}%"></div></div><p class="muted">已学 ${learned()}/688 · 今天到期 ${due().length} 词 · 已获 ${data.steps} 步</p><button class="btn primary wide" onclick="navigate('study')">📚 开启连续学习与智能复习</button><button class="btn wide" onclick="navigate('map')">🏝️ 小镇探索冒险</button><button class="btn wide" onclick="navigate('companion')">🐱 去魔法伙伴小屋</button></div><div class="card"><b>⚙️ 每日学习新词</b><p class="muted">试玩版可自主调整；已认识的词不会重复算新词。</p><div class="row"><input type="number" min="1" max="50" value="${data.daily}" id="count"><button class="btn green" onclick="setDaily()">保存数量</button></div></div><div class="muted" style="text-align:center">独立试玩存档，不覆盖6.0 · 当前离线HTML，不是已安装PWA</div>`}
 function setDaily(){let v=Number($('count').value);if(!Number.isInteger(v)||v<1||v>50){alert('请输入1—50');return}data.daily=v;draw()}
